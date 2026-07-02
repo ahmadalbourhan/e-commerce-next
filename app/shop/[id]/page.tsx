@@ -166,6 +166,9 @@ export default function ProductDetailPage() {
               </div>
 
               <h1 className="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">{product.name}</h1>
+              {product.description && (
+                <p className="scent-text-muted mt-4 leading-7 text-pretty">{product.description}</p>
+              )}
               <p className="scent-price mt-4 text-2xl font-semibold tabular-nums">{money(Number(product.price ?? 0))}</p>
 
               <Separator className="my-6" />

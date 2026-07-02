@@ -130,6 +130,7 @@ export interface Order {
   user?: {
     id: number
     username: string
+    phoneNumber?: string | null
   } | null
   status: string
   total: number

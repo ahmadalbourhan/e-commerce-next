@@ -75,6 +75,9 @@ function ProductCard({ product, onAdd }: { product: Product; onAdd: (product: Pr
         </div>
         <CardHeader className="min-h-0 justify-between gap-2 pt-3">
           <CardTitle className="line-clamp-1 text-base font-medium">{product.name}</CardTitle>
+          {product.description && (
+            <p className="scent-text-muted line-clamp-2 text-xs">{product.description}</p>
+          )}
           <div className="flex items-center justify-between gap-3">
             <span className="scent-price font-semibold tabular-nums">{money(Number(product.price ?? 0))}</span>
             <span className="scent-text-muted text-xs">{product.stock ?? 0} in stock</span>

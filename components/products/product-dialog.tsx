@@ -39,6 +39,7 @@ interface ProductDialogProps {
 export function ProductDialog({ open, onOpenChange, product, categories, onSaved }: ProductDialogProps) {
   const isEdit = Boolean(product)
   const [name, setName] = useState("")
+  const [description, setDescription] = useState("")
   const [cost, setCost] = useState("")
   const [price, setPrice] = useState("")
   const [stock, setStock] = useState("")
@@ -51,6 +52,7 @@ export function ProductDialog({ open, onOpenChange, product, categories, onSaved
   useEffect(() => {
     if (open) {
       setName(product?.name ?? "")
+      setDescription(product?.description ?? "")
       setCost(product?.cost != null ? String(product.cost) : "")
       setPrice(product?.price != null ? String(product.price) : "")
       setStock(product?.stock != null ? String(product.stock) : "0")
@@ -96,6 +98,7 @@ export function ProductDialog({ open, onOpenChange, product, categories, onSaved
       const payload = {
         id: product?.id ?? 0,
         name: name.trim(),
+        description: description.trim() || null,
         cost: Number(cost) || 0,
         price: Number(price) || 0,
         stock: Number(stock) || 0,
@@ -124,7 +127,7 @@ export function ProductDialog({ open, onOpenChange, product, categories, onSaved
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-lg">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>{isEdit ? "Edit product" : "New product"}</DialogTitle>
@@ -137,6 +140,17 @@ export function ProductDialog({ open, onOpenChange, product, categories, onSaved
             <div className="grid gap-2">
               <Label htmlFor="name">Name</Label>
               <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="description">Description</Label>
+              <textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                maxLength={1000}
+                placeholder="Optional product description"
+                className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring min-h-24 w-full rounded-md border px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">

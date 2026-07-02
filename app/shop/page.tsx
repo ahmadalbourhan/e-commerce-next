@@ -66,6 +66,9 @@ function ProductCard({ product, onAdd }: { product: Product; onAdd: (product: Pr
         </div>
         <CardHeader className="gap-3 pt-3">
           <CardTitle className="line-clamp-1 text-base font-medium">{product.name}</CardTitle>
+          {product.description && (
+            <p className="scent-text-muted line-clamp-2 text-xs">{product.description}</p>
+          )}
           <div className="flex items-center justify-between gap-3">
             <Badge variant="outline" className="border-[#d7b15f]/25 bg-[#fffaf0] text-[#53647c]">{product.category?.name ?? "Uncategorized"}</Badge>
             <span className="scent-price font-semibold tabular-nums">{money(Number(product.price ?? 0))}</span>
