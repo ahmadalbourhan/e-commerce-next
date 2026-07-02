@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Separator } from "@/components/ui/separator"
 import {
   Select,
   SelectContent,
@@ -20,9 +21,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { StorefrontFooter } from "@/components/storefront/footer"
 import { cn } from "@/lib/utils"
-import { ChevronLeft, ChevronRight, Package, Search, ShoppingBag, ShoppingCart, UserRound } from "lucide-react"
+import { ChevronLeft, ChevronRight, Loader2, Minus, Package, Plus, Search, ShoppingBag, ShoppingCart, UserRound } from "lucide-react"
 import { toast } from "sonner"
 
 const pageSize = 12
@@ -87,6 +89,7 @@ function ShopPageContent() {
   const hasOrders = useHasOrders()
   const cart = useCart()
   const [searchInput, setSearchInput] = useState(params.get("search") ?? "")
+  const [cartOpen, setCartOpen] = useState(false)
 
   const page = Math.max(1, Number(params.get("page") ?? 1))
   const categoryId = params.get("categoryId") ?? "all"
@@ -173,10 +176,10 @@ function ShopPageContent() {
                 Track orders
               </Link>
             )}
-            <Link href="/checkout" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "scent-outline")}>
+            <Button variant="outline" size="sm" className="scent-outline" onClick={() => setCartOpen(true)}>
               <ShoppingCart className="size-4" />
               {cart.count > 0 && cart.count}
-            </Link>
+            </Button>
             {user ? (
               <Button variant="ghost" size="sm" className="text-[#f7e7bd] hover:bg-white/10 hover:text-[#d7b15f]" onClick={logout}>
                 <UserRound className="size-4" />
@@ -295,6 +298,54 @@ function ShopPageContent() {
           </>
         )}
       </div>
+      <Sheet open={cartOpen} onOpenChange={setCartOpen}>
+        <SheetContent side="right" className="scent-panel w-[22rem] max-w-[calc(100vw-2rem)] gap-0 p-0 sm:max-w-md">
+          <SheetHeader className="border-b border-[#d7b15f]/25">
+            <SheetTitle className="flex items-center gap-2">
+              <ShoppingCart className="size-5" />
+              Cart
+            </SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 space-y-4 overflow-y-auto p-4">
+            {cart.items.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Your cart is empty.</p>
+            ) : (
+              cart.items.map((item) => (
+                <div key={item.product.id} className="grid grid-cols-[1fr_auto] gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{item.product.name}</p>
+                    <p className="text-xs text-muted-foreground">{money(cart.getItemTotal(item.product.id))}</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button variant="outline" size="icon" className="size-7" onClick={() => item.quantity <= 1 ? cart.removeItem(item.product.id) : cart.updateQuantity(item.product.id, item.quantity - 1)}>
+                      <Minus className="size-3" />
+                    </Button>
+                    <span className="w-6 text-center text-sm tabular-nums">{item.quantity}</span>
+                    <Button variant="outline" size="icon" className="size-7" disabled={item.quantity >= Number(item.product.stock ?? 0)} onClick={() => cart.updateQuantity(item.product.id, item.quantity + 1)}>
+                      <Plus className="size-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <SheetFooter className="border-t border-[#d7b15f]/25">
+            <div className="space-y-3">
+              <Separator />
+              <div className="flex items-center justify-between font-medium">
+                <span>Subtotal</span>
+                <span className="flex items-center gap-2 tabular-nums">
+                  {cart.totalsLoading && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
+                  {money(cart.subtotal)}
+                </span>
+              </div>
+              <Link href="/checkout" className={cn(buttonVariants(), "scent-primary w-full", cart.items.length === 0 && "pointer-events-none opacity-50")}>
+                Checkout
+              </Link>
+            </div>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
       <StorefrontFooter />
     </main>
   )
