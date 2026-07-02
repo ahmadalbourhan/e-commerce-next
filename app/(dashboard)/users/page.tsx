@@ -1,13 +1,12 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useDeferredValue, useMemo, useState } from "react"
 import useSWR from "swr"
 import { api, swrFetcher } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
 import type { User, Role } from "@/lib/types"
 import { PageHeader } from "@/components/dashboard/page-header"
 import { UserDialog } from "@/components/users/user-dialog"
-import { UserPermissionsSheet } from "@/components/users/user-permissions-sheet"
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog"
 import { TableSkeleton, ErrorState, EmptyState } from "@/components/dashboard/data-states"
 import { Button } from "@/components/ui/button"
@@ -37,7 +36,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { toast } from "sonner"
-import { Plus, Search, MoreHorizontal, Pencil, Trash2, KeyRound, Shield } from "lucide-react"
+import { Plus, Search, MoreHorizontal, Pencil, Trash2, Shield } from "lucide-react"
 
 function initials(name?: string | null, email?: string) {
   const base = name?.trim() || email || "?"
@@ -45,16 +44,23 @@ function initials(name?: string | null, email?: string) {
   return (parts[0]?.[0] ?? "?").toUpperCase() + (parts[1]?.[0]?.toUpperCase() ?? "")
 }
 
+function isSuperAdmin(user: User) {
+  return user.roleName === "SuperAdmin" || user.roles?.includes("SuperAdmin")
+}
+
 export default function UsersPage() {
   const { refreshUser } = useAuth()
-  const { data, error, isLoading, mutate } = useSWR<User[]>("/api/Users", swrFetcher)
-  const { data: roles } = useSWR<Role[]>("/api/Roles", swrFetcher)
   const [query, setQuery] = useState("")
+  const deferredQuery = useDeferredValue(query)
+  const usersUrl = useMemo(() => {
+    const search = deferredQuery.trim()
+    return search ? `/api/Users?search=${encodeURIComponent(search)}` : "/api/Users"
+  }, [deferredQuery])
+  const { data, error, isLoading, mutate } = useSWR<User[]>(usersUrl, swrFetcher)
+  const { data: roles } = useSWR<Role[]>("/api/Roles", swrFetcher)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<User | null>(null)
   const [deleting, setDeleting] = useState<User | null>(null)
-  const [permsUser, setPermsUser] = useState<User | null>(null)
-  const [permsOpen, setPermsOpen] = useState(false)
   const [assigningRole, setAssigningRole] = useState<number | null>(null)
 
   const roleMap = useMemo(() => {
@@ -63,17 +69,14 @@ export default function UsersPage() {
     return m
   }, [roles])
 
-  const filtered = useMemo(() => {
-    if (!data) return []
-    const q = query.trim().toLowerCase()
-    if (!q) return data
-    return data.filter(
-      (u) => u.email?.toLowerCase().includes(q) || u.fullName?.toLowerCase().includes(q),
-    )
-  }, [data, query])
-
   async function handleDelete() {
     if (!deleting) return
+    if (isSuperAdmin(deleting)) {
+      toast.error("The Super Admin account cannot be deleted.")
+      setDeleting(null)
+      return
+    }
+
     try {
       await api.del(`/api/Users/${deleting.id}`)
       toast.success("User deleted")
@@ -116,11 +119,6 @@ export default function UsersPage() {
     }
   }
 
-  function openPerms(u: User) {
-    setPermsUser(u)
-    setPermsOpen(true)
-  }
-
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -154,7 +152,7 @@ export default function UsersPage() {
           <TableSkeleton cols={5} />
         ) : error ? (
           <ErrorState message={(error as Error).message} onRetry={() => mutate()} />
-        ) : filtered.length === 0 ? (
+        ) : !data || data.length === 0 ? (
           <EmptyState
             title={query ? "No matching accounts" : "No accounts yet"}
             description={query ? "Try a different search." : "Create your first account."}
@@ -171,7 +169,10 @@ export default function UsersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((u) => (
+              {data.map((u) => {
+                const superAdmin = isSuperAdmin(u)
+
+                return (
                 <TableRow key={u.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -222,10 +223,6 @@ export default function UsersPage() {
                           <Pencil className="size-4" />
                           Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => openPerms(u)}>
-                          <KeyRound className="size-4" />
-                          Permissions
-                        </DropdownMenuItem>
                         <DropdownMenuSub>
                           <DropdownMenuSubTrigger>
                             <Shield className="size-4" />
@@ -253,7 +250,17 @@ export default function UsersPage() {
                           </DropdownMenuSubContent>
                         </DropdownMenuSub>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem variant="destructive" onClick={() => setDeleting(u)}>
+                        <DropdownMenuItem
+                          variant="destructive"
+                          disabled={superAdmin}
+                          onClick={() => {
+                            if (superAdmin) {
+                              toast.error("The Super Admin account cannot be deleted.")
+                              return
+                            }
+                            setDeleting(u)
+                          }}
+                        >
                           <Trash2 className="size-4" />
                           Delete
                         </DropdownMenuItem>
@@ -261,7 +268,8 @@ export default function UsersPage() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))}
+                )
+              })}
             </TableBody>
           </Table>
         )}
@@ -277,8 +285,6 @@ export default function UsersPage() {
           void refreshUser()
         }}
       />
-
-      <UserPermissionsSheet user={permsUser} open={permsOpen} onOpenChange={setPermsOpen} />
 
       <ConfirmDialog
         open={Boolean(deleting)}

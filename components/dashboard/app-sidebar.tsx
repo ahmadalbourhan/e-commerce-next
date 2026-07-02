@@ -9,12 +9,13 @@ import {
   FolderTree,
   Users,
   Shield,
-  KeyRound,
   ShieldCheck,
+  LogOut,
 } from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarHeader,
@@ -44,12 +45,11 @@ const navGroups = [
     items: [
       { title: "Users", href: "/users", icon: Users },
       { title: "Roles", href: "/roles", icon: Shield },
-      { title: "Permissions", href: "/permissions", icon: KeyRound },
     ],
   },
 ]
 
-export function AppSidebar() {
+export function AppSidebar({ onSignOut }: { onSignOut: () => void }) {
   const pathname = usePathname()
 
   return (
@@ -89,6 +89,16 @@ export function AppSidebar() {
           </SidebarGroup>
         ))}
       </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={onSignOut} tooltip="Sign out">
+              <LogOut className="size-4" />
+              <span>Sign out</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   )

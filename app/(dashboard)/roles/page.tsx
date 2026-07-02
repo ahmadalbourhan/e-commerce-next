@@ -29,6 +29,10 @@ import {
 import { toast } from "sonner"
 import { Plus, MoreHorizontal, Pencil, Trash2, KeyRound } from "lucide-react"
 
+function isSuperAdminRole(role?: Role | null) {
+  return role?.name === "SuperAdmin"
+}
+
 export default function RolesPage() {
   const { data, error, isLoading, mutate } = useSWR<Role[]>("/api/Roles", swrFetcher)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -39,6 +43,12 @@ export default function RolesPage() {
 
   async function handleDelete() {
     if (!deleting) return
+    if (isSuperAdminRole(deleting)) {
+      toast.error("The Super Admin role cannot be deleted.")
+      setDeleting(null)
+      return
+    }
+
     try {
       await api.del(`/api/Roles/${deleting.id}`)
       toast.success("Role deleted")
@@ -86,7 +96,10 @@ export default function RolesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((r) => (
+              {data.map((r) => {
+                const superAdmin = isSuperAdminRole(r)
+
+                return (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{r.name}</TableCell>
                   <TableCell className="text-muted-foreground">{r.description || "—"}</TableCell>
@@ -118,7 +131,17 @@ export default function RolesPage() {
                           Permissions
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem variant="destructive" onClick={() => setDeleting(r)}>
+                        <DropdownMenuItem
+                          variant="destructive"
+                          disabled={superAdmin}
+                          onClick={() => {
+                            if (superAdmin) {
+                              toast.error("The Super Admin role cannot be deleted.")
+                              return
+                            }
+                            setDeleting(r)
+                          }}
+                        >
                           <Trash2 className="size-4" />
                           Delete
                         </DropdownMenuItem>
@@ -126,7 +149,8 @@ export default function RolesPage() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))}
+                )
+              })}
             </TableBody>
           </Table>
         )}

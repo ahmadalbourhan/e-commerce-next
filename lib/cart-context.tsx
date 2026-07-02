@@ -25,6 +25,24 @@ interface CartContextValue {
 const CartContext = createContext<CartContextValue | undefined>(undefined)
 const GUEST_CART_KEY = "ecom_cart_guest"
 
+function readStoredItems(key: string): CartItem[] {
+  try {
+    const stored = localStorage.getItem(key)
+    return stored ? (JSON.parse(stored) as CartItem[]) : []
+  } catch {
+    return []
+  }
+}
+
+export function getStoredCartCount(userId?: number | null) {
+  if (typeof window === "undefined") return 0
+
+  const keys = userId ? [`ecom_cart_user_${userId}`, GUEST_CART_KEY] : [GUEST_CART_KEY]
+  return keys.reduce((sum, key) => {
+    return sum + readStoredItems(key).reduce((itemSum, item) => itemSum + Number(item.quantity ?? 0), 0)
+  }, 0)
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [items, setItems] = useState<CartItem[]>([])
@@ -40,16 +58,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const stored = localStorage.getItem(cartKey)
-      if (stored) setItems(JSON.parse(stored) as CartItem[])
-      else setItems([])
-    } catch {
+      const storedItems = readStoredItems(cartKey)
+      if (storedItems.length > 0) {
+        setItems(storedItems)
+        return
+      }
+
+      const guestItems = user ? readStoredItems(GUEST_CART_KEY) : []
+      if (guestItems.length > 0) {
+        localStorage.setItem(cartKey, JSON.stringify(guestItems))
+        setItems(guestItems)
+        return
+      }
+
       setItems([])
     } finally {
       setActiveCartKey(cartKey)
       setLoaded(true)
     }
-  }, [cartKey])
+  }, [cartKey, user])
 
   useEffect(() => {
     if (loaded && activeCartKey) localStorage.setItem(activeCartKey, JSON.stringify(items))

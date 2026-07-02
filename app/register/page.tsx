@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { api } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
+import { getStoredCartCount } from "@/lib/cart-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -28,8 +29,8 @@ export default function RegisterPage() {
   }, [])
 
   useEffect(() => {
-    if (!loading && user) router.replace(nextPath)
-  }, [loading, user, router, nextPath])
+    if (!loading && user) router.replace(getStoredCartCount(user.id) > 0 ? "/checkout" : "/")
+  }, [loading, user, router])
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
@@ -38,7 +39,7 @@ export default function RegisterPage() {
       await api.post("/api/Auth/register", { fullName, email, phoneNumber, password }, true)
       await login(email, password)
       toast.success("Account created")
-      router.replace(nextPath)
+      router.replace(getStoredCartCount() > 0 ? "/checkout" : "/")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to register")
     } finally {

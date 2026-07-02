@@ -30,30 +30,40 @@ export function CategoryDialog({ open, onOpenChange, category, onSaved }: Catego
   const isEdit = Boolean(category)
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
+  const [descriptionError, setDescriptionError] = useState("")
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (open) {
       setName(category?.name ?? "")
       setDescription(category?.description ?? "")
+      setDescriptionError("")
     }
   }, [open, category])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    const trimmedDescription = description.trim()
+    if (!trimmedDescription) {
+      const message = "Please enter a description for this category."
+      setDescriptionError(message)
+      toast.error(message)
+      return
+    }
+
     setSaving(true)
     try {
       if (isEdit && category) {
         await api.put(`/Category/${category.id}`, {
           id: category.id,
           name: name.trim(),
-          description: description.trim() || null,
+          description: trimmedDescription,
         })
         toast.success("Category updated")
       } else {
         await api.post("/Category", {
           name: name.trim(),
-          description: description.trim() || null,
+          description: trimmedDescription,
         })
         toast.success("Category created")
       }
@@ -87,9 +97,20 @@ export function CategoryDialog({ open, onOpenChange, category, onSaved }: Catego
               <Input
                 id="cat-desc"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Optional"
+                onChange={(e) => {
+                  setDescription(e.target.value)
+                  if (descriptionError) setDescriptionError("")
+                }}
+                placeholder="Describe this category"
+                required
+                aria-invalid={Boolean(descriptionError)}
+                aria-describedby={descriptionError ? "cat-desc-error" : undefined}
               />
+              {descriptionError && (
+                <p id="cat-desc-error" className="text-sm text-destructive">
+                  {descriptionError}
+                </p>
+              )}
             </div>
           </div>
 

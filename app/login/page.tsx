@@ -5,6 +5,7 @@ import type React from "react"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
+import { getStoredCartCount } from "@/lib/cart-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -25,8 +26,8 @@ export default function LoginPage() {
   }, [])
 
   useEffect(() => {
-    if (!loading && user) router.replace(nextPath)
-  }, [loading, user, router, nextPath])
+    if (!loading && user) router.replace(getStoredCartCount(user.id) > 0 ? "/checkout" : "/")
+  }, [loading, user, router])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -34,7 +35,7 @@ export default function LoginPage() {
     try {
       await login(email, password)
       toast.success("Signed in successfully")
-      router.replace(nextPath)
+      router.replace(getStoredCartCount() > 0 ? "/checkout" : "/")
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to sign in")
     } finally {
