@@ -1,6 +1,6 @@
 "use client"
 
-import type { FormEvent } from "react"
+import type { ChangeEvent, FormEvent } from "react"
 import { useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
@@ -30,6 +30,40 @@ function stars(rating: number) {
 function formatDate(value?: string | null) {
   if (!value) return ""
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value))
+}
+
+function validateReviewComment(comment: string) {
+  const value = comment.trim().toLowerCase()
+  if (!value) return null
+
+  const blockedPatterns = [
+    "<script",
+    "</script",
+    "javascript:",
+    "onerror=",
+    "onload=",
+    "onclick=",
+    "--",
+    ";--",
+    "/*",
+    "*/",
+    "xp_",
+    "drop table",
+    "drop database",
+    "delete from",
+    "insert into",
+    "update ",
+    "select ",
+    "union select",
+    "alter table",
+    "truncate table",
+    "exec ",
+    "execute ",
+  ]
+
+  return blockedPatterns.some((pattern) => value.includes(pattern))
+    ? "Comment cannot contain JavaScript or SQL commands."
+    : null
 }
 
 function isAdminRole(role?: string | null) {
@@ -94,7 +128,8 @@ export default function ProductDetailPage() {
   const [reviewOrderId, setReviewOrderId] = useState("")
   const [reviewRating, setReviewRating] = useState("5")
   const [reviewComment, setReviewComment] = useState("")
-  const [reviewImageUrl, setReviewImageUrl] = useState("")
+  const [reviewImageFile, setReviewImageFile] = useState<File | null>(null)
+  const [reviewImagePreview, setReviewImagePreview] = useState("")
   const [submittingReview, setSubmittingReview] = useState(false)
   const rawId = params.id
   const productId = Array.isArray(rawId) ? rawId[0] : rawId
@@ -129,25 +164,68 @@ export default function ProductDetailPage() {
       return
     }
 
+    const commentError = validateReviewComment(reviewComment)
+    if (commentError) {
+      toast.error(commentError)
+      return
+    }
+
     setSubmittingReview(true)
     try {
+      let imageUrl: string | null = null
+      if (reviewImageFile) {
+        const formData = new FormData()
+        formData.append("file", reviewImageFile)
+        const uploaded = await api.uploadWrapped<{ imageUrl: string }>(
+          `/api/user/products/${productId}/reviews/upload-image`,
+          formData,
+        )
+        imageUrl = uploaded.imageUrl
+      }
+
       await api.post(`/api/user/products/${productId}/reviews`, {
         orderId: Number(reviewOrderId),
         rating: Number(reviewRating),
         comment: reviewComment.trim() || null,
-        imageUrl: reviewImageUrl.trim() || null,
+        imageUrl,
       })
       toast.success("Review added")
       setReviewOrderId("")
       setReviewRating("5")
       setReviewComment("")
-      setReviewImageUrl("")
+      setReviewImageFile(null)
+      setReviewImagePreview("")
       await Promise.all([reviews.mutate(), stats.mutate(), eligibility.mutate()])
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to add review")
     } finally {
       setSubmittingReview(false)
     }
+  }
+
+  function handleReviewImageChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null
+    if (!file) {
+      setReviewImageFile(null)
+      setReviewImagePreview("")
+      return
+    }
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"]
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("Only JPG, PNG, WebP, and GIF images are allowed.")
+      event.target.value = ""
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image size must be 5 MB or less.")
+      event.target.value = ""
+      return
+    }
+
+    setReviewImageFile(file)
+    setReviewImagePreview(URL.createObjectURL(file))
   }
 
   function addToCart() {
@@ -384,22 +462,42 @@ export default function ProductDetailPage() {
                     <textarea
                       id="review-comment"
                       value={reviewComment}
-                      onChange={(event) => setReviewComment(event.target.value)}
+                      onChange={(event) => {
+                        const value = event.target.value
+                        setReviewComment(value)
+                        const commentError = validateReviewComment(value)
+                        if (commentError) toast.error(commentError)
+                      }}
                       maxLength={1000}
                       placeholder="Optional"
                       className="scent-input min-h-24 w-full rounded-md border px-3 py-2 text-sm"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label htmlFor="review-image" className="text-sm font-medium">Image URL</label>
-                    <input
-                      id="review-image"
-                      value={reviewImageUrl}
-                      onChange={(event) => setReviewImageUrl(event.target.value)}
-                      maxLength={1000}
-                      placeholder="Optional"
-                      className="scent-input h-10 w-full rounded-md border px-3 text-sm"
-                    />
+                    <label htmlFor="review-image" className="text-sm font-medium">Image</label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        id="review-image"
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/gif"
+                        onChange={handleReviewImageChange}
+                        className="sr-only"
+                      />
+                      <label
+                        htmlFor="review-image"
+                        className="flex size-12 cursor-pointer items-center justify-center rounded-md border border-[#d7b15f]/35 bg-[#fffaf0] text-[#9a742d] transition-colors hover:bg-[#f1dfbd]"
+                        aria-label="Choose review image"
+                      >
+                        <Plus className="size-5" />
+                      </label>
+                      {reviewImagePreview && (
+                        <img
+                          src={reviewImagePreview}
+                          alt="Review image preview"
+                          className="h-16 w-16 rounded-md object-cover"
+                        />
+                      )}
+                    </div>
                   </div>
                   <Button type="submit" className="scent-primary w-full" disabled={submittingReview}>
                     {submittingReview ? "Saving..." : "Submit review"}

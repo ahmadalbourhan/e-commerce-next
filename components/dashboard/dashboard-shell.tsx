@@ -2,15 +2,17 @@
 
 import type { ReactNode } from "react"
 import { useEffect } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { AppSidebar } from "./app-sidebar"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Loader2, ShieldAlert } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { ArrowLeft, Loader2, ShieldAlert, Store } from "lucide-react"
 
 function isAdminRole(role?: string | null) {
   return role === "Admin" || role === "SuperAdmin"
@@ -69,6 +71,10 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
           <div className="flex flex-1 items-center justify-end">
+            <Link href="/" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mr-3")}>
+              <Store className="size-4" />
+              View store
+            </Link>
             <Badge variant="secondary" className="max-w-[180px] truncate">
               {user.fullName || user.email || "User"}
             </Badge>
