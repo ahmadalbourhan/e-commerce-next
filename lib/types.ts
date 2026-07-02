@@ -65,6 +65,40 @@ export interface Product {
   } | null
 }
 
+export interface ProductReview {
+  id: number
+  productId: number
+  userId: number
+  orderId: number
+  rating: number
+  comment?: string | null
+  imageUrl?: string | null
+  createdAt: string
+  user?: {
+    id: number
+    username: string
+    phoneNumber?: string | null
+  } | null
+}
+
+export interface ProductReviewStats {
+  productId: number
+  totalReviews: number
+  averageRating: number
+  ratingCounts: Record<number, number>
+}
+
+export interface ProductReviewEligibility {
+  canReview: boolean
+  message?: string | null
+  orders: {
+    orderId: number
+    orderNumber: string
+    orderedAt: string
+    deliveredAt?: string | null
+  }[]
+}
+
 export interface CategoryWithProducts {
   id: number
   name: string
