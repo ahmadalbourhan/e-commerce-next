@@ -1,14 +1,15 @@
 "use client"
 
+import type { FormEvent } from "react"
 import { useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import useSWR from "swr"
-import { getApiAssetUrl, swrWrappedFetcher } from "@/lib/api"
+import { api, getApiAssetUrl, swrWrappedFetcher } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
 import { useCart } from "@/lib/cart-context"
 import { useHasOrders } from "@/lib/use-has-orders"
-import type { Product } from "@/lib/types"
+import type { PagedResult, Product, ProductReview, ProductReviewEligibility, ProductReviewStats } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -20,6 +21,15 @@ import { toast } from "sonner"
 
 function money(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
+}
+
+function stars(rating: number) {
+  return "★★★★★".slice(0, rating) + "☆☆☆☆☆".slice(0, Math.max(0, 5 - rating))
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return ""
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value))
 }
 
 function isAdminRole(role?: string | null) {
@@ -80,10 +90,23 @@ export default function ProductDetailPage() {
   const router = useRouter()
   const { user } = useAuth()
   const cart = useCart()
+  const [reviewPage, setReviewPage] = useState(1)
+  const [reviewOrderId, setReviewOrderId] = useState("")
+  const [reviewRating, setReviewRating] = useState("5")
+  const [reviewComment, setReviewComment] = useState("")
+  const [reviewImageUrl, setReviewImageUrl] = useState("")
+  const [submittingReview, setSubmittingReview] = useState(false)
   const rawId = params.id
   const productId = Array.isArray(rawId) ? rawId[0] : rawId
   const { data: product, error, isLoading } = useSWR<Product>(
     productId ? `/api/user/products/${productId}` : null,
+    swrWrappedFetcher,
+  )
+  const reviewPath = productId ? `/api/user/products/${productId}/reviews?page=${reviewPage}&pageSize=5` : null
+  const reviews = useSWR<PagedResult<ProductReview>>(reviewPath, swrWrappedFetcher)
+  const stats = useSWR<ProductReviewStats>(productId ? `/api/user/products/${productId}/reviews/stats` : null, swrWrappedFetcher)
+  const eligibility = useSWR<ProductReviewEligibility>(
+    user && productId ? `/api/user/products/${productId}/reviews/eligibility` : null,
     swrWrappedFetcher,
   )
   const stock = Number(product?.stock ?? 0)
@@ -96,6 +119,36 @@ export default function ProductDetailPage() {
   )
   const remainingStock = Math.max(0, stock - cartQuantity)
   const maxQuantity = Math.max(1, remainingStock)
+  const reviewResult = reviews.data
+  const reviewStats = stats.data
+
+  async function submitReview(event: FormEvent) {
+    event.preventDefault()
+    if (!productId || !reviewOrderId) {
+      toast.error("Choose the delivered order for this review.")
+      return
+    }
+
+    setSubmittingReview(true)
+    try {
+      await api.post(`/api/user/products/${productId}/reviews`, {
+        orderId: Number(reviewOrderId),
+        rating: Number(reviewRating),
+        comment: reviewComment.trim() || null,
+        imageUrl: reviewImageUrl.trim() || null,
+      })
+      toast.success("Review added")
+      setReviewOrderId("")
+      setReviewRating("5")
+      setReviewComment("")
+      setReviewImageUrl("")
+      await Promise.all([reviews.mutate(), stats.mutate(), eligibility.mutate()])
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to add review")
+    } finally {
+      setSubmittingReview(false)
+    }
+  }
 
   function addToCart() {
     if (!product) return
@@ -128,8 +181,8 @@ export default function ProductDetailPage() {
         </Link>
 
         {isLoading ? (
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(22rem,0.75fr)]">
-            <Card className="scent-soft-panel h-[34rem] animate-pulse" />
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,0.75fr)_minmax(22rem,0.85fr)]">
+            <Card className="scent-soft-panel h-[22rem] animate-pulse" />
             <Card className="scent-panel h-[28rem] animate-pulse" />
           </div>
         ) : error || !product ? (
@@ -138,14 +191,14 @@ export default function ProductDetailPage() {
             <p className="scent-text-muted mt-1 text-sm">The product may have been removed or is unavailable.</p>
           </Card>
         ) : (
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(22rem,0.75fr)] lg:items-start">
+                   <div className="grid gap-8 lg:grid-cols-[minmax(0,0.75fr)_minmax(22rem,0.85fr)] lg:items-start">
             <section className="scent-media overflow-hidden rounded-lg border border-[#d7b15f]/25">
-              <div className="flex min-h-[24rem] items-center justify-center lg:min-h-[32rem]">
+              <div className="flex  min-h-[20rem] items-center justify-center sm:h-[20rem] lg:h-[30rem]">
                 {product.image || product.imageUrl ? (
                   <img
                     src={getApiAssetUrl(product.image || product.imageUrl)}
                     alt={product.name}
-                    className="h-full max-h-[34rem] w-full object-contain"
+                    className="h-full max-h-[34rem] w-full object-cover"
                   />
                 ) : (
                   <Package className="size-16 text-[#b9854d]" />
@@ -164,6 +217,14 @@ export default function ProductDetailPage() {
                   <Badge className="bg-[#071323] text-[#d7b15f]">{stock} in stock</Badge>
                 )}
               </div>
+
+              {reviewStats && reviewStats.totalReviews > 0 && (
+                <div className="mt-4 flex items-center gap-2 text-sm">
+                  <span className="text-[#d7b15f]">{stars(Math.round(reviewStats.averageRating))}</span>
+                  <span className="font-medium">{reviewStats.averageRating.toFixed(1)}</span>
+                  <span className="scent-text-muted">({reviewStats.totalReviews} reviews)</span>
+                </div>
+              )}
 
               <h1 className="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">{product.name}</h1>
               {product.description && (
@@ -216,6 +277,137 @@ export default function ProductDetailPage() {
               </div>
             </section>
           </div>
+        )}
+
+        {!isLoading && product && (
+          <section className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+            <Card className="scent-panel p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-semibold tracking-tight">Reviews</h2>
+                  <p className="scent-text-muted mt-1 text-sm">
+                    {reviewStats?.totalReviews ? `${reviewStats.totalReviews} customer reviews` : "No reviews yet."}
+                  </p>
+                </div>
+                {reviewStats && reviewStats.totalReviews > 0 && (
+                  <div className="text-right">
+                    <div className="text-[#d7b15f]">{stars(Math.round(reviewStats.averageRating))}</div>
+                    <div className="text-sm font-medium">{reviewStats.averageRating.toFixed(1)} average</div>
+                  </div>
+                )}
+              </div>
+
+              <Separator className="my-5" />
+
+              {reviews.isLoading ? (
+                <p className="scent-text-muted text-sm">Loading reviews...</p>
+              ) : !reviewResult || reviewResult.items.length === 0 ? (
+                <p className="scent-text-muted text-sm">Be the first eligible customer to review this product.</p>
+              ) : (
+                <div className="space-y-5">
+                  {reviewResult.items.map((review) => (
+                    <article key={review.id} className="border-b border-[#d7b15f]/20 pb-5 last:border-b-0 last:pb-0">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="font-medium">{review.user?.username || "Customer"}</p>
+                          <p className="scent-text-muted text-xs">{formatDate(review.createdAt)}</p>
+                        </div>
+                        <div className="text-[#d7b15f]">{stars(review.rating)}</div>
+                      </div>
+                      {review.comment && <p className="mt-3 text-sm leading-6 text-[#53647c]">{review.comment}</p>}
+                      {review.imageUrl && (
+                        <img
+                          src={getApiAssetUrl(review.imageUrl)}
+                          alt="Review image"
+                          className="mt-3 h-32 w-32 rounded-md object-cover"
+                        />
+                      )}
+                    </article>
+                  ))}
+                  {reviewResult.totalPages > 1 && (
+                    <div className="flex items-center justify-between gap-3 pt-2">
+                      <Button variant="outline" className="scent-outline" disabled={reviewPage <= 1} onClick={() => setReviewPage((page) => Math.max(1, page - 1))}>
+                        Previous
+                      </Button>
+                      <span className="scent-text-muted text-sm">Page {reviewResult.page} of {reviewResult.totalPages}</span>
+                      <Button variant="outline" className="scent-outline" disabled={reviewPage >= reviewResult.totalPages} onClick={() => setReviewPage((page) => page + 1)}>
+                        Next
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </Card>
+
+            <Card className="scent-panel p-6">
+              <h2 className="text-lg font-semibold tracking-tight">Write a review</h2>
+              {!user ? (
+                <p className="scent-text-muted mt-3 text-sm">Sign in after receiving your order to review this product.</p>
+              ) : eligibility.isLoading ? (
+                <p className="scent-text-muted mt-3 text-sm">Checking review eligibility...</p>
+              ) : !eligibility.data?.canReview ? (
+                <p className="scent-text-muted mt-3 text-sm">{eligibility.data?.message ?? "You can review this product after delivery."}</p>
+              ) : (
+                <form onSubmit={submitReview} className="mt-4 space-y-4">
+                  <div className="space-y-2">
+                    <label htmlFor="review-order" className="text-sm font-medium">Delivered order</label>
+                    <select
+                      id="review-order"
+                      value={reviewOrderId}
+                      onChange={(event) => setReviewOrderId(event.target.value)}
+                      required
+                      className="scent-input h-10 w-full rounded-md border px-3 text-sm"
+                    >
+                      <option value="">Select an order</option>
+                      {eligibility.data.orders.map((order) => (
+                        <option key={order.orderId} value={order.orderId}>
+                          {order.orderNumber} {order.deliveredAt ? `- delivered ${formatDate(order.deliveredAt)}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="review-rating" className="text-sm font-medium">Rating</label>
+                    <select
+                      id="review-rating"
+                      value={reviewRating}
+                      onChange={(event) => setReviewRating(event.target.value)}
+                      className="scent-input h-10 w-full rounded-md border px-3 text-sm"
+                    >
+                      {[5, 4, 3, 2, 1].map((rating) => (
+                        <option key={rating} value={rating}>{rating} stars</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="review-comment" className="text-sm font-medium">Comment</label>
+                    <textarea
+                      id="review-comment"
+                      value={reviewComment}
+                      onChange={(event) => setReviewComment(event.target.value)}
+                      maxLength={1000}
+                      placeholder="Optional"
+                      className="scent-input min-h-24 w-full rounded-md border px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label htmlFor="review-image" className="text-sm font-medium">Image URL</label>
+                    <input
+                      id="review-image"
+                      value={reviewImageUrl}
+                      onChange={(event) => setReviewImageUrl(event.target.value)}
+                      maxLength={1000}
+                      placeholder="Optional"
+                      className="scent-input h-10 w-full rounded-md border px-3 text-sm"
+                    />
+                  </div>
+                  <Button type="submit" className="scent-primary w-full" disabled={submittingReview}>
+                    {submittingReview ? "Saving..." : "Submit review"}
+                  </Button>
+                </form>
+              )}
+            </Card>
+          </section>
         )}
       </div>
       <StorefrontFooter />
