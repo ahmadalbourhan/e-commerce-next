@@ -50,7 +50,7 @@ function ProductCard({ product, onAdd }: { product: Product; onAdd: (product: Pr
       )}
       <Button
         size="icon"
-        className="scent-dark-button absolute right-3 top-3 z-10 size-9 opacity-0 shadow-lg transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+        className="absolute right-3 top-3 z-10 size-9 bg-[#9a742d] text-white opacity-0 shadow-lg transition-opacity hover:bg-[#876526] hover:text-white focus-visible:opacity-100 group-hover:opacity-100"
         onClick={() => onAdd(product)}
         disabled={outOfStock}
         aria-label={`Add ${product.name} to cart`}
