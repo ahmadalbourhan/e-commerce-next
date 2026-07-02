@@ -8,15 +8,15 @@ import useSWR from "swr"
 import { api, getApiAssetUrl, swrWrappedFetcher } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
 import { useCart } from "@/lib/cart-context"
-import { useHasOrders } from "@/lib/use-has-orders"
 import type { PagedResult, Product, ProductReview, ProductReviewEligibility, ProductReviewStats } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { StorefrontFooter } from "@/components/storefront/footer"
-import { ChevronLeft, Minus, Package, Plus, ShoppingBag, ShoppingCart, UserRound } from "lucide-react"
+import { StorefrontHeader } from "@/components/storefront/header"
+import { ChevronLeft, Minus, Package, Plus, ShoppingBag } from "lucide-react"
 import { toast } from "sonner"
 
 function money(value: number) {
@@ -64,59 +64,6 @@ function validateReviewComment(comment: string) {
   return blockedPatterns.some((pattern) => value.includes(pattern))
     ? "Comment cannot contain JavaScript or SQL commands."
     : null
-}
-
-function isAdminRole(role?: string | null) {
-  return role === "Admin" || role === "SuperAdmin"
-}
-
-function StorefrontHeader() {
-  const { user, logout } = useAuth()
-  const hasOrders = useHasOrders()
-  const cart = useCart()
-
-  return (
-    <header className="scent-header sticky top-0 z-30 border-b backdrop-blur">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
-        <Link href="/" className="flex items-center gap-2 font-semibold">
-          <span className="scent-brand-mark flex size-9 items-center justify-center rounded-md">
-            <Package className="size-5" />
-          </span>
-          Scent
-        </Link>
-        <nav className="hidden items-center gap-5 text-sm md:flex">
-          <Link href="/shop" className="scent-nav-link-active">Products</Link>
-          {hasOrders && <Link href="/orders" className="scent-nav-link">Track orders</Link>}
-        </nav>
-        <div className="flex items-center gap-2">
-          {isAdminRole(user?.role) && (
-            <Link href="/dashboard" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "scent-outline")}>
-              Dashboard
-            </Link>
-          )}
-          {hasOrders && (
-            <Link href="/orders" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "text-[#f7e7bd] hover:bg-transparent hover:text-[#d7b15f] md:hidden")}>
-              Track orders
-            </Link>
-          )}
-          <Link href="/checkout" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "scent-outline")}>
-            <ShoppingCart className="size-4" />
-            {cart.count > 0 && cart.count}
-          </Link>
-          {user ? (
-            <Button variant="ghost" size="sm" className="text-[#f7e7bd] hover:bg-white/10 hover:text-[#d7b15f]" onClick={logout}>
-              <UserRound className="size-4" />
-              Sign out
-            </Button>
-          ) : (
-            <Link href="/login?next=/checkout" className={cn(buttonVariants({ size: "sm" }), "scent-primary")}>
-              Sign in
-            </Link>
-          )}
-        </div>
-      </div>
-    </header>
-  )
 }
 
 export default function ProductDetailPage() {
@@ -251,7 +198,7 @@ export default function ProductDetailPage() {
 
   return (
     <main className="scent-shell min-h-svh">
-      <StorefrontHeader />
+      <StorefrontHeader active="shop" signInNext="/checkout" />
       <div className="mx-auto max-w-7xl px-4 py-8">
         <Link href="/shop" className="scent-text-muted mb-5 inline-flex items-center gap-2 text-sm font-medium hover:text-[#0b1b31]">
           <ChevronLeft className="size-4" />

@@ -4,15 +4,14 @@ import Link from "next/link"
 import useSWR from "swr"
 import { swrWrappedFetcher } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
-import { useCart } from "@/lib/cart-context"
-import { useHasOrders } from "@/lib/use-has-orders"
 import type { Order } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StorefrontFooter } from "@/components/storefront/footer"
+import { StorefrontHeader } from "@/components/storefront/header"
 import { cn, parseBackendDate } from "@/lib/utils"
-import { Package, PackageCheck, ShoppingCart, UserRound } from "lucide-react"
+import { PackageCheck } from "lucide-react"
 
 function money(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value)
@@ -24,59 +23,6 @@ function dateLabel(value?: string | null) {
   return date ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(date) : "-"
 }
 
-function isAdminRole(role?: string | null) {
-  return role === "Admin" || role === "SuperAdmin"
-}
-
-function StorefrontHeader() {
-  const { user, logout } = useAuth()
-  const hasOrders = useHasOrders()
-  const cart = useCart()
-
-  return (
-    <header className="scent-header sticky top-0 z-30 border-b backdrop-blur">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
-        <Link href="/" className="flex items-center gap-2 font-semibold">
-          <span className="scent-brand-mark flex size-9 items-center justify-center rounded-md">
-            <Package className="size-5" />
-          </span>
-          Scent
-        </Link>
-        <nav className="hidden items-center gap-5 text-sm md:flex">
-          <Link href="/shop" className="scent-nav-link">Products</Link>
-          {hasOrders && <Link href="/orders" className="scent-nav-link-active">Track orders</Link>}
-        </nav>
-        <div className="flex items-center gap-2">
-          {isAdminRole(user?.role) && (
-            <Link href="/dashboard" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "scent-outline")}>
-              Dashboard
-            </Link>
-          )}
-          {hasOrders && (
-            <Link href="/orders" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "text-[#d7b15f] hover:bg-transparent hover:text-[#f7e7bd] md:hidden")}>
-              Track orders
-            </Link>
-          )}
-          <Link href="/checkout" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "scent-outline")}>
-            <ShoppingCart className="size-4" />
-            {cart.count > 0 && cart.count}
-          </Link>
-          {user ? (
-            <Button variant="ghost" size="sm" className="text-[#f7e7bd] hover:bg-white/10 hover:text-[#d7b15f]" onClick={logout}>
-              <UserRound className="size-4" />
-              Sign out
-            </Button>
-          ) : (
-            <Link href="/login?next=/orders" className={cn(buttonVariants({ size: "sm" }), "scent-primary")}>
-              Sign in
-            </Link>
-          )}
-        </div>
-      </div>
-    </header>
-  )
-}
-
 export default function OrdersPage() {
   const { user, loading } = useAuth()
   const orders = useSWR<Order[]>(user ? "/api/user/orders" : null, swrWrappedFetcher)
@@ -84,7 +30,7 @@ export default function OrdersPage() {
   if (!loading && !user) {
     return (
       <main className="scent-shell flex min-h-svh flex-col">
-        <StorefrontHeader />
+        <StorefrontHeader active="orders" signInNext="/orders" />
         <div className="flex flex-1 items-center justify-center p-4">
           <Card className="scent-panel w-full max-w-sm text-center">
             <CardHeader>
@@ -102,7 +48,7 @@ export default function OrdersPage() {
 
   return (
     <main className="scent-shell flex min-h-svh flex-col">
-      <StorefrontHeader />
+      <StorefrontHeader active="orders" signInNext="/orders" />
       <div className="mx-auto w-full max-w-5xl flex-1 space-y-4 px-4 py-6">
         <div className="flex items-center justify-between">
           <Button variant="outline" className="scent-outline" onClick={() => orders.mutate()}>Refresh</Button>
