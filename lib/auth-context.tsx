@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react"
-import { api, getUserFromAccessToken, refreshSession, tokenStore } from "./api"
+import { api, getAccessTokenExpiration, getUserFromAccessToken, refreshSession, tokenStore } from "./api"
 import type { AuthUser, LoginResponse } from "./types"
 
 interface AuthContextValue {
@@ -88,20 +88,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) return
 
+    const refreshBufferMs = 60_000
+
+    function shouldRefreshSoon() {
+      const expiresAt = getAccessTokenExpiration(tokenStore.getAccess())
+      return expiresAt === null || expiresAt - Date.now() <= refreshBufferMs
+    }
+
     function refreshWhenVisible() {
-      if (document.visibilityState === "visible") {
+      if (document.visibilityState === "visible" && shouldRefreshSoon()) {
         void refreshUser()
       }
     }
 
     window.addEventListener("focus", refreshWhenVisible)
     document.addEventListener("visibilitychange", refreshWhenVisible)
-    const interval = window.setInterval(() => void refreshUser(), 60_000)
+
+    const expiresAt = getAccessTokenExpiration(tokenStore.getAccess())
+    const refreshDelay = expiresAt === null
+      ? 0
+      : Math.max(0, expiresAt - Date.now() - refreshBufferMs)
+    const timeout = window.setTimeout(() => void refreshUser(), refreshDelay)
 
     return () => {
       window.removeEventListener("focus", refreshWhenVisible)
       document.removeEventListener("visibilitychange", refreshWhenVisible)
-      window.clearInterval(interval)
+      window.clearTimeout(timeout)
     }
   }, [refreshUser, user])
 

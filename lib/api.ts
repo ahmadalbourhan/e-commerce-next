@@ -47,6 +47,14 @@ export function isAccessTokenExpired(token: string | null): boolean {
   return exp * 1000 <= Date.now()
 }
 
+export function getAccessTokenExpiration(token: string | null): number | null {
+  if (!token) return null
+
+  const payload = decodeJwtPayload(token)
+  const exp = Number(payload?.exp ?? 0)
+  return exp ? exp * 1000 : null
+}
+
 export function getUserFromAccessToken(token: string | null): AuthUser | null {
   if (!token || typeof window === "undefined") return null
   if (isAccessTokenExpired(token)) return null

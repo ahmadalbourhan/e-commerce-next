@@ -14,7 +14,6 @@ import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Switch } from "@/components/ui/switch"
 import {
   Table,
   TableBody,
@@ -100,25 +99,6 @@ export default function UsersPage() {
     }
   }
 
-  async function toggleStatus(user: User) {
-    try {
-      await api.put(`/api/Users/${user.id}`, {
-        ...user,
-        id: user.id,
-        name: user.fullName || user.name || user.email,
-        fullName: user.fullName || user.name || user.email,
-        username: user.username || user.email,
-        isActive: user.isActive === false,
-        roleId: user.roleId ?? null,
-      })
-      toast.success(`${user.fullName || user.email} is now ${user.isActive === false ? "active" : "inactive"}`)
-      mutate()
-      await refreshUser()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update status")
-    }
-  }
-
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
@@ -149,7 +129,7 @@ export default function UsersPage() {
 
       <Card className="overflow-hidden p-0">
         {isLoading ? (
-          <TableSkeleton cols={5} />
+          <TableSkeleton cols={3} />
         ) : error ? (
           <ErrorState message={(error as Error).message} onRetry={() => mutate()} />
         ) : !data || data.length === 0 ? (
@@ -163,8 +143,6 @@ export default function UsersPage() {
               <TableRow>
                 <TableHead>User</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead>Permissions</TableHead>
-                <TableHead>Status</TableHead>
                 <TableHead className="w-12" />
               </TableRow>
             </TableHeader>
@@ -195,15 +173,6 @@ export default function UsersPage() {
                     ) : (
                       <span className="text-sm text-muted-foreground">No role</span>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{u.permissions?.length ?? 0}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Switch checked={u.isActive !== false} onCheckedChange={() => toggleStatus(u)} />
-                      <span className="text-sm text-muted-foreground">{u.isActive === false ? "Inactive" : "Active"}</span>
-                    </div>
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>

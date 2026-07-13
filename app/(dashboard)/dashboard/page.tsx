@@ -113,8 +113,7 @@ export default function DashboardPage() {
   const catalogValue = productList.reduce((sum, product) => sum + Number(product.price ?? 0) * Number(product.stock ?? 1), 0)
   const catalogCost = productList.reduce((sum, product) => sum + Number(product.cost ?? 0) * Number(product.stock ?? 1), 0)
   const grossMargin = catalogValue > 0 ? ((catalogValue - catalogCost) / catalogValue) * 100 : 0
-  const assignedProducts = productList.filter((product) => product.categoryId).length
-  const uncategorizedProducts = productList.length - assignedProducts
+  const emptyCategories = categoryList.filter((category) => (category.products?.length ?? 0) === 0).length
   const totalStock = productList.reduce((sum, product) => sum + Number(product.stock ?? 0), 0)
   const lowStockProducts = productList.filter((product) => Number(product.stock ?? 0) <= 5).length
   const orderRevenue = orderList
@@ -350,6 +349,7 @@ export default function DashboardPage() {
             ) : topCategories.length > 0 ? (
               topCategories.map((category) => {
                 const count = category.products?.length ?? 0
+                const width = count > 0 ? Math.max(6, (count / maxCategoryProducts) * 100) : 0
                 return (
                   <div key={category.id} className="space-y-2">
                     <div className="flex items-center justify-between gap-3 text-sm">
@@ -359,7 +359,7 @@ export default function DashboardPage() {
                     <div className="h-2 rounded-full bg-muted">
                       <div
                         className="h-full rounded-full bg-primary shadow-sm"
-                        style={{ width: `${Math.max(6, (count / maxCategoryProducts) * 100)}%` }}
+                        style={{ width: `${width}%` }}
                       />
                     </div>
                   </div>
@@ -374,8 +374,8 @@ export default function DashboardPage() {
                 <div className="mt-1 text-xl font-semibold tabular-nums">{categoryList.length}</div>
               </div>
               <div className="rounded-md border p-3">
-                <div className="text-xs text-muted-foreground">Unassigned</div>
-                <div className="mt-1 text-xl font-semibold tabular-nums">{uncategorizedProducts}</div>
+                <div className="text-xs text-muted-foreground">Empty categories</div>
+                <div className="mt-1 text-xl font-semibold tabular-nums">{emptyCategories}</div>
               </div>
             </div>
           </CardContent>
