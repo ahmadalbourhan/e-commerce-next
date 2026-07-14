@@ -65,6 +65,48 @@ export interface Product {
   } | null
 }
 
+export interface DashboardSummary {
+  totalOrders: number
+  orderRevenue: number
+  totalStock: number
+  lowStockProducts: number
+  activeUsers: number
+  totalCategories: number
+  emptyCategories: number
+  orderStatusCounts: Record<string, number>
+  recentOrders: DashboardOrder[]
+  recentProducts: DashboardProduct[]
+  topCategories: DashboardCategory[]
+}
+
+export interface DashboardOrder {
+  id: number
+  orderNumber: string
+  userId: number
+  username?: string | null
+  status: string
+  total: number
+  orderedAt: string
+  itemCount: number
+}
+
+export interface DashboardProduct {
+  id: number
+  name: string
+  cost: number
+  price: number
+  stock: number
+  image?: string | null
+  createdAt: string
+  categoryName?: string | null
+}
+
+export interface DashboardCategory {
+  id: number
+  name: string
+  productCount: number
+}
+
 export interface ProductReview {
   id: number
   productId: number

@@ -2,8 +2,8 @@
 
 import useSWR from "swr"
 import Link from "next/link"
-import { getApiAssetUrl, swrWrappedFetcher, swrFetcher } from "@/lib/api"
-import type { Product, CategoryWithProducts, User, Order } from "@/lib/types"
+import { getApiAssetUrl, swrWrappedFetcher } from "@/lib/api"
+import type { DashboardProduct, DashboardSummary } from "@/lib/types"
 import { PageHeader } from "@/components/dashboard/page-header"
 import { ErrorState } from "@/components/dashboard/data-states"
 import { Badge } from "@/components/ui/badge"
@@ -34,8 +34,8 @@ function dateLabel(value?: string | null) {
   return date ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date) : "No date"
 }
 
-function productImage(product: Product) {
-  return getApiAssetUrl(product.image || product.imageUrl) || "/placeholder.jpg"
+function productImage(product: DashboardProduct) {
+  return getApiAssetUrl(product.image) || "/placeholder.jpg"
 }
 
 function stockTone(stock?: number | null) {
@@ -96,42 +96,15 @@ function StatCard({
 
 export default function DashboardPage() {
   const { user } = useAuth()
-  const products = useSWR<Product[]>("/Product", swrWrappedFetcher)
-  const categories = useSWR<CategoryWithProducts[]>("/Category", swrWrappedFetcher)
-  const users = useSWR<User[]>("/api/Users", swrFetcher)
-  const orders = useSWR<Order[]>("/Order", swrWrappedFetcher)
-
-  const productList = products.data ?? []
-  const categoryList = categories.data ?? []
-  const userList = users.data ?? []
-  const orderList = orders.data ?? []
-
-  const loading = products.isLoading || categories.isLoading || users.isLoading || orders.isLoading
-  const hasError = products.error || categories.error || users.error || orders.error
-
-  const activeUsers = userList.filter((u) => u.isActive !== false).length
-  const catalogValue = productList.reduce((sum, product) => sum + Number(product.price ?? 0) * Number(product.stock ?? 1), 0)
-  const catalogCost = productList.reduce((sum, product) => sum + Number(product.cost ?? 0) * Number(product.stock ?? 1), 0)
-  const grossMargin = catalogValue > 0 ? ((catalogValue - catalogCost) / catalogValue) * 100 : 0
-  const emptyCategories = categoryList.filter((category) => (category.products?.length ?? 0) === 0).length
-  const totalStock = productList.reduce((sum, product) => sum + Number(product.stock ?? 0), 0)
-  const lowStockProducts = productList.filter((product) => Number(product.stock ?? 0) <= 5).length
-  const orderRevenue = orderList
-    .filter((order) => order.status.toLowerCase() === "delivered")
-    .reduce((sum, order) => sum + Number(order.total ?? 0), 0)
-  const pendingOrders = orderList.filter((order) => order.status.toLowerCase() === "pending").length
-  const deliveredOrders = orderList.filter((order) => order.status.toLowerCase() === "delivered").length
-  const cancelledOrders = orderList.filter((order) => order.status.toLowerCase() === "cancelled").length
-  const recentOrders = [...orderList]
-    .sort((a, b) => (parseBackendDate(b.orderedAt)?.getTime() ?? 0) - (parseBackendDate(a.orderedAt)?.getTime() ?? 0))
-    .slice(0, 5)
-  const topCategories = [...categoryList]
-    .sort((a, b) => (b.products?.length ?? 0) - (a.products?.length ?? 0))
-    .slice(0, 5)
-  const maxCategoryProducts = Math.max(1, ...topCategories.map((category) => category.products?.length ?? 0))
-  const recentProducts = [...productList]
-    .sort((a, b) => (parseBackendDate(b.createdAt)?.getTime() ?? 0) - (parseBackendDate(a.createdAt)?.getTime() ?? 0))
-    .slice(0, 5)
+  const summary = useSWR<DashboardSummary>("/api/Dashboard/summary", swrWrappedFetcher)
+  const data = summary.data
+  const pendingOrders = data?.orderStatusCounts.pending ?? 0
+  const deliveredOrders = data?.orderStatusCounts.delivered ?? 0
+  const cancelledOrders = data?.orderStatusCounts.cancelled ?? 0
+  const recentOrders = data?.recentOrders ?? []
+  const recentProducts = data?.recentProducts ?? []
+  const topCategories = data?.topCategories ?? []
+  const maxCategoryProducts = Math.max(1, ...topCategories.map((category) => category.productCount))
 
   return (
     <div className="flex flex-col gap-6">
@@ -152,15 +125,12 @@ export default function DashboardPage() {
         }
       />
 
-      {hasError && (
+      {summary.error && (
         <Card className="rounded-lg p-0">
           <ErrorState
             message="Some dashboard data could not be loaded. Check that the backend is running and your session is valid."
             onRetry={() => {
-              products.mutate()
-              categories.mutate()
-              users.mutate()
-              orders.mutate()
+              summary.mutate()
             }}
           />
         </Card>
@@ -169,33 +139,33 @@ export default function DashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           title="Orders"
-          value={orderList.length}
+          value={data?.totalOrders ?? 0}
           detail={`${pendingOrders} pending review`}
-          loading={orders.isLoading}
+          loading={summary.isLoading}
           icon={ReceiptText}
           href="/dashboard/orders"
         />
         <StatCard
           title="Order Revenue"
-          value={currency(orderRevenue)}
+          value={currency(data?.orderRevenue ?? 0)}
           detail={`${deliveredOrders} delivered, ${cancelledOrders} cancelled`}
-          loading={orders.isLoading}
+          loading={summary.isLoading}
           icon={CircleDollarSign}
           href="/dashboard/orders"
         />
         <StatCard
           title="Inventory Units"
-          value={totalStock}
-          detail={`${lowStockProducts} low stock products`}
-          loading={products.isLoading}
+          value={data?.totalStock ?? 0}
+          detail={`${data?.lowStockProducts ?? 0} low stock products`}
+          loading={summary.isLoading}
           icon={ShoppingBag}
           href="/products"
         />
         <StatCard
           title="Customers"
-          value={activeUsers}
+          value={data?.activeUsers ?? 0}
           detail="Active user accounts"
-          loading={users.isLoading}
+          loading={summary.isLoading}
           icon={Users}
           href="/users"
         />
@@ -213,7 +183,7 @@ export default function DashboardPage() {
             </Link>
           </CardHeader>
           <CardContent className="space-y-3">
-            {orders.isLoading ? (
+            {summary.isLoading ? (
               Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-16 w-full" />)
             ) : recentOrders.length > 0 ? (
               recentOrders.map((order) => (
@@ -221,7 +191,7 @@ export default function DashboardPage() {
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">{order.orderNumber}</div>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <span>{order.user?.username || `User #${order.userId}`}</span>
+                      <span>{order.username || `User #${order.userId}`}</span>
                       <span>{dateLabel(order.orderedAt)}</span>
                       <span className={cn("rounded px-1.5 py-0.5 font-medium capitalize", statusTone(order.status))}>
                         {order.status}
@@ -231,7 +201,7 @@ export default function DashboardPage() {
                   <div className="text-right">
                     <div className="text-sm font-medium tabular-nums">{currency(Number(order.total ?? 0))}</div>
                     <div className="text-xs text-muted-foreground tabular-nums">
-                      {order.items.reduce((sum, item) => sum + item.quantity, 0)} items
+                      {order.itemCount} items
                     </div>
                   </div>
                 </div>
@@ -254,17 +224,17 @@ export default function DashboardPage() {
             <p className="text-sm text-muted-foreground">Fulfillment distribution across current orders.</p>
           </CardHeader>
           <CardContent className="space-y-4">
-            {orders.isLoading ? (
+            {summary.isLoading ? (
               Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-10 w-full" />)
             ) : (
               [
                 ["Pending", pendingOrders],
                 ["Delivered", deliveredOrders],
                 ["Cancelled", cancelledOrders],
-                ["Accepted", orderList.filter((order) => order.status.toLowerCase() === "accepted").length],
+                ["Accepted", data?.orderStatusCounts.accepted ?? 0],
               ].map(([label, count]) => {
                 const numericCount = Number(count)
-                const width = orderList.length > 0 ? Math.max(6, (numericCount / orderList.length) * 100) : 0
+                const width = (data?.totalOrders ?? 0) > 0 ? Math.max(6, (numericCount / (data?.totalOrders ?? 1)) * 100) : 0
                 return (
                   <div key={label} className="space-y-2">
                     <div className="flex items-center justify-between gap-3 text-sm">
@@ -294,7 +264,7 @@ export default function DashboardPage() {
             </Link>
           </CardHeader>
           <CardContent className="space-y-3">
-            {loading ? (
+            {summary.isLoading ? (
               Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-16 w-full" />)
             ) : recentProducts.length > 0 ? (
               recentProducts.map((product) => (
@@ -307,7 +277,7 @@ export default function DashboardPage() {
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">{product.name}</div>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <span>{product.category?.name || categoryList.find((c) => c.id === product.categoryId)?.name || "Uncategorized"}</span>
+                      <span>{product.categoryName || "Uncategorized"}</span>
                       <span>{dateLabel(product.createdAt)}</span>
                       <span className={cn("rounded px-1.5 py-0.5 font-medium", stockTone(product.stock))}>
                         {product.stock ?? 0} in stock
@@ -344,11 +314,11 @@ export default function DashboardPage() {
             <p className="text-sm text-muted-foreground">Product distribution across your strongest categories.</p>
           </CardHeader>
           <CardContent className="space-y-4">
-            {categories.isLoading ? (
+            {summary.isLoading ? (
               Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-10 w-full" />)
             ) : topCategories.length > 0 ? (
               topCategories.map((category) => {
-                const count = category.products?.length ?? 0
+                const count = category.productCount
                 const width = count > 0 ? Math.max(6, (count / maxCategoryProducts) * 100) : 0
                 return (
                   <div key={category.id} className="space-y-2">
@@ -371,11 +341,11 @@ export default function DashboardPage() {
             <div className="grid grid-cols-2 gap-3 pt-2">
               <div className="rounded-md border p-3">
                 <div className="text-xs text-muted-foreground">Categories</div>
-                <div className="mt-1 text-xl font-semibold tabular-nums">{categoryList.length}</div>
+                <div className="mt-1 text-xl font-semibold tabular-nums">{data?.totalCategories ?? 0}</div>
               </div>
               <div className="rounded-md border p-3">
                 <div className="text-xs text-muted-foreground">Empty categories</div>
-                <div className="mt-1 text-xl font-semibold tabular-nums">{emptyCategories}</div>
+                <div className="mt-1 text-xl font-semibold tabular-nums">{data?.emptyCategories ?? 0}</div>
               </div>
             </div>
           </CardContent>
